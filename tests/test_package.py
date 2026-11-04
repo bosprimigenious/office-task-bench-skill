@@ -64,6 +64,13 @@ class PackageTests(unittest.TestCase):
         for deliverable in task["deliverables"]:
             self.assertIn(deliverable["path"], prompt)
 
+    def test_demo_total_is_graded_in_the_requested_memo(self):
+        demo = ROOT / "examples/demo"
+        task = json.loads((demo / "task.json").read_text(encoding="utf-8"))
+        outputs = {item["id"]: item["path"] for item in task["deliverables"]}
+        total_check = next(item for item in task["criteria"] if item["id"] == "C04")
+        self.assertEqual(outputs[total_check["deliverable_id"]], "output/memo.md")
+
     def install_script(self, root):
         readme = (ROOT / "README.md").read_text(encoding="utf-8")
         scripts = re.findall(r"```bash\n(.*?)```", readme, re.DOTALL)

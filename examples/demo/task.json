@@ -52,7 +52,7 @@
     {
       "id": "D01",
       "path": "output/review.csv",
-      "description": "逐笔金额和合计"
+      "description": "逐笔可付、已付和剩余应付金额"
     },
     {
       "id": "D02",
@@ -110,7 +110,7 @@
         "A02",
         "A03"
       ],
-      "deliverable_id": "D01",
+      "deliverable_id": "D02",
       "oracle_path": "private/oracle.json",
       "oracle_sha256": "0a28d0728b6c8bedcf9694d655e9464e7c0a2ba81c572f4f24002adb27c80966",
       "tolerance": "金额允许误差0.01元；状态与原因必须正确"
