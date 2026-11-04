@@ -9,10 +9,11 @@ from __future__ import annotations
 
 import argparse
 from datetime import datetime
+from decimal import Decimal, DecimalException, localcontext
 import hashlib
 import json
 import math
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 import re
 import sys
 from typing import Any
@@ -74,7 +75,7 @@ def _safe_path(root: Path, value: Any, label: str, *, exists: bool = False,
                public: bool = False, private: bool = False) -> Path:
     raw = _text(value, label)
     rel = Path(raw)
-    if rel.is_absolute() or ".." in rel.parts or "\\" in raw:
+    if rel.is_absolute() or PureWindowsPath(raw).drive or ".." in rel.parts or "\\" in raw:
         raise InputError(f"{label} must be a portable relative path without '..'")
     try:
         path = (root / rel).resolve()
@@ -89,6 +90,12 @@ def _safe_path(root: Path, value: Any, label: str, *, exists: bool = False,
         raise InputError(f"{label} must remain inside private/")
     if exists and not path.is_file():
         raise InputError(f"{label} does not name an existing regular file")
+    if exists:
+        try:
+            if path.stat().st_size == 0:
+                raise InputError(f"{label} names an empty file; evidence must contain content")
+        except OSError as exc:
+            raise InputError(f"Cannot inspect {label}: {exc}") from exc
     return path
 
 
@@ -101,6 +108,28 @@ def _digest(path: Path) -> str:
     except OSError as exc:
         raise InputError(f"Cannot read {path}: {exc}") from exc
     return result.hexdigest()
+
+
+def _same_file(left: Path, right: Path) -> bool:
+    """Compare existing file identities as well as future path names."""
+    if left == right:
+        return True
+    try:
+        return left.samefile(right)
+    except (FileNotFoundError, NotADirectoryError):
+        return False
+    except OSError as exc:
+        raise InputError(f"Cannot compare file identities: {exc}") from exc
+
+
+def _check_output_location(path: Path, root: Path, label: str) -> None:
+    if path.exists() and not path.is_file():
+        raise InputError(f"{label} must name a file, not an existing directory or special file")
+    parent = path.parent
+    while parent != root:
+        if parent.exists() and not parent.is_dir():
+            raise InputError(f"{label} has an existing file as a parent directory")
+        parent = parent.parent
 
 
 def _version(data: dict[str, Any]) -> None:
@@ -131,6 +160,7 @@ def _refs(value: Any, label: str) -> set[str]:
 def validate_task(path: str | Path) -> dict[str, Any]:
     """Check a task package's structure. Semantic/human checks remain external."""
     data, root = _load(path)
+    manifest = Path(path).resolve()
     errors: list[str] = []
     warnings = ["Structural checks do not validate semantic correctness, business authenticity, rights, or grading quality; human review is still required."]
     mode = data.get("mode")
@@ -191,8 +221,14 @@ def validate_task(path: str | Path) -> dict[str, Any]:
         try:
             _text(item.get("description"), f"deliverables.{identifier}.description")
             output_path = _safe_path(root, item.get("path"), f"deliverables.{identifier}.path", public=True)
-            if output_path in output_paths or output_path in input_paths or output_path == prompt:
+            _check_output_location(output_path, root, f"deliverables.{identifier}.path")
+            protected_paths = [manifest, prompt, *input_paths]
+            if any(_same_file(output_path, protected) for protected in protected_paths):
                 errors.append(f"deliverables.{identifier}: output path duplicates an output or overwrites an input")
+            if any(_same_file(output_path, existing)
+                   or output_path.is_relative_to(existing) or existing.is_relative_to(output_path)
+                   for existing in output_paths):
+                errors.append(f"deliverables.{identifier}: output files have duplicate identities or parent/child path conflicts")
             output_paths.add(output_path)
         except InputError as exc:
             errors.append(str(exc))
@@ -224,7 +260,7 @@ def validate_task(path: str | Path) -> dict[str, Any]:
                 errors.append(label + ".oracle_sha256: SHA-256 mismatch")
             if oracle in input_paths or oracle_digest in input_hashes or oracle_digest == prompt_digest:
                 errors.append(label + ": oracle content leaks into solver-visible input/prompt")
-            if oracle in output_paths:
+            if any(_same_file(oracle, output) for output in output_paths):
                 errors.append(label + ": deliverable overwrites an oracle")
         except InputError as exc:
             errors.append(str(exc))
@@ -290,28 +326,38 @@ def estimate_cost(path: str | Path) -> dict[str, Any]:
         _number(data.get(name), name, integer=name in ("attachment_count", "model_runs"),
                 maximum=1 if name == "rework_rate" else None)
     try:
-        labor_minutes = data["attachment_count"] * (
-            data["author_minutes_per_attachment"] + data["review_minutes_per_attachment"]
-            + data["rework_rate"] * data["rework_minutes_per_attachment"])
-        labor_cost = labor_minutes / 60 * data["hourly_rate"]
-        if billing_mode == "api":
-            model_cost = data["model_runs"] * (data["input_tokens_per_run"] * data["input_price_per_million"]
-                         + data["output_tokens_per_run"] * data["output_price_per_million"]) / 1_000_000
-        else:
-            model_cost = data["subscription_allocated_cost"] + data["model_runs"] * data["overage_cost_per_run"]
-        tool_cost = data["model_runs"] * data["tool_cost_per_run"]
-        total = labor_cost + model_cost + tool_cost + data["fixed_cost"]
-        remaining = data["budget_cap"] - total
-        if not all(math.isfinite(value) for value in (labor_minutes, labor_cost, model_cost, tool_cost, total, remaining)):
-            raise OverflowError
-    except (OverflowError, ValueError) as exc:
+        with localcontext() as context:
+            # Validated inputs fit finite JSON floats; keep decimal budget boundaries
+            # exact before producing rounded JSON numbers for the report.
+            context.prec = 1000
+            values = {name: Decimal(str(data[name])) for name in names}
+            labor_minutes = values["attachment_count"] * (
+                values["author_minutes_per_attachment"] + values["review_minutes_per_attachment"]
+                + values["rework_rate"] * values["rework_minutes_per_attachment"])
+            labor_hours = labor_minutes / 60
+            labor_cost = labor_minutes * values["hourly_rate"] / 60
+            if billing_mode == "api":
+                model_cost = values["model_runs"] * (
+                    values["input_tokens_per_run"] * values["input_price_per_million"]
+                    + values["output_tokens_per_run"] * values["output_price_per_million"]) / 1_000_000
+            else:
+                model_cost = values["subscription_allocated_cost"] + values["model_runs"] * values["overage_cost_per_run"]
+            tool_cost = values["model_runs"] * values["tool_cost_per_run"]
+            total = labor_cost + model_cost + tool_cost + values["fixed_cost"]
+            remaining = values["budget_cap"] - total
+            over_budget = total > values["budget_cap"]
+            report_values = {"labor_hours": labor_hours, "labor_cost": labor_cost,
+                             "model_cost": model_cost, "tool_cost": tool_cost,
+                             "total_cost": total, "remaining_budget": remaining}
+            if not all(math.isfinite(float(value)) for value in [labor_minutes, *report_values.values()]):
+                raise OverflowError
+            rounded = {key: float(round(value, 4)) if round(value, 4) else 0.0
+                       for key, value in report_values.items()}
+    except (OverflowError, ValueError, DecimalException) as exc:
         raise InputError("Budget arithmetic exceeds the supported finite numeric range") from exc
-    return {"status": "OVER_BUDGET" if total > data["budget_cap"] else "WITHIN_ESTIMATE",
+    return {"status": "OVER_BUDGET" if over_budget else "WITHIN_ESTIMATE",
             "billing_mode": billing_mode, "currency": currency, "attachment_count": data["attachment_count"],
-            "labor_hours": round(labor_minutes / 60, 4), "labor_cost": round(labor_cost, 4),
-            "model_cost": round(model_cost, 4), "tool_cost": round(tool_cost, 4),
-            "fixed_cost": data["fixed_cost"], "total_cost": round(total, 4),
-            "budget_cap": data["budget_cap"], "remaining_budget": round(remaining, 4),
+            **rounded, "fixed_cost": data["fixed_cost"], "budget_cap": data["budget_cap"],
             "warnings": ["Planning estimate only; supplied rates are not verified current prices. Shared preparation/ground-truth work belongs in fixed_cost; subscription allocation belongs only in subscription_allocated_cost to avoid double counting. Runtime is not estimated from attachment count."]}
 
 

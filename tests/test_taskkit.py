@@ -8,6 +8,7 @@ import hashlib
 import importlib.util
 import io
 import json
+import os
 from pathlib import Path
 import tempfile
 import unittest
@@ -191,6 +192,79 @@ class ValidateTests(Fixture):
         data["deliverables"][0]["path"] = "inputs/invoice.csv"
         self.assertIn("overwrites an input", " ".join(self.check(data)["errors"]))
 
+    def test_deliverable_cannot_overwrite_manifest_or_prompt(self):
+        for target in ("task.json", "prompt.md"):
+            with self.subTest(target=target):
+                data = self.task()
+                data["deliverables"][0]["path"] = target
+                self.assertEqual(self.check(data)["status"], "NOT_READY")
+
+    def test_deliverable_directory_and_file_parent_are_rejected(self):
+        self.write("outputs/blocker", "An existing file")
+        for target in ("inputs", "outputs/blocker/nested/result.csv"):
+            with self.subTest(target=target):
+                data = self.task()
+                data["deliverables"][0]["path"] = target
+                self.assertEqual(self.check(data)["status"], "NOT_READY")
+
+    def test_parent_child_outputs_conflict_in_both_orders(self):
+        for paths in (("result", "result/part.csv"), ("result/part.csv", "result")):
+            with self.subTest(paths=paths):
+                data = self.task()
+                data["deliverables"][0]["path"] = paths[0]
+                data["deliverables"].append({"id": "D2", "path": paths[1], "description": "Second result"})
+                data["criteria"][1]["deliverable_id"] = "D2"
+                self.assertIn("parent/child", " ".join(self.check(data)["errors"]))
+
+    def test_output_hardlinks_cannot_overwrite_protected_files(self):
+        self.json_file("task.json", self.task())
+        for i, target in enumerate(("inputs/invoice.csv", "prompt.md", "private/oracle.json", "task.json")):
+            with self.subTest(target=target):
+                alias = f"alias-{i}.csv"
+                os.link(self.root / target, self.root / alias)
+                data = self.task()
+                data["deliverables"][0]["path"] = alias
+                self.assertEqual(self.check(data)["status"], "NOT_READY")
+
+    def test_two_outputs_cannot_alias_the_same_inode(self):
+        self.write("outputs/one.csv", "Existing output")
+        os.link(self.root / "outputs/one.csv", self.root / "outputs/two.csv")
+        data = self.task()
+        data["deliverables"][0]["path"] = "outputs/one.csv"
+        data["deliverables"].append({"id": "D2", "path": "outputs/two.csv", "description": "Second result"})
+        data["criteria"][1]["deliverable_id"] = "D2"
+        self.assertIn("duplicate identities", " ".join(self.check(data)["errors"]))
+
+    def test_legitimate_output_paths_remain_valid(self):
+        self.write("outputs/existing.csv", "Previous unrelated output")
+        for target in ("outputs/existing.csv", "new/nested/result.csv"):
+            with self.subTest(target=target):
+                data = self.task()
+                data["deliverables"][0]["path"] = target
+                self.assertEqual(self.check(data)["status"], "STRUCTURE_PASS")
+
+    def test_windows_drive_paths_are_rejected_on_every_platform(self):
+        for target in ("C:/result.csv", "C:result.csv", "//server/share/result.csv"):
+            with self.subTest(target=target):
+                data = self.task()
+                data["deliverables"][0]["path"] = target
+                self.assertIn("portable relative path", " ".join(self.check(data)["errors"]))
+
+    def test_empty_input_prompt_and_oracle_are_rejected(self):
+        for target in ("inputs/invoice.csv", "prompt.md", "private/oracle.json"):
+            with self.subTest(target=target):
+                original = (self.root / target).read_bytes()
+                try:
+                    self.write(target, "")
+                    data = self.task()
+                    self.assertIn("empty file", " ".join(self.check(data)["errors"]))
+                finally:
+                    (self.root / target).write_bytes(original)
+
+    def test_header_only_csv_remains_valid(self):
+        self.write("inputs/invoice.csv", "id,amount\n")
+        self.assertEqual(self.check(self.task())["status"], "STRUCTURE_PASS")
+
     def test_malformed_dependency_reports_error_instead_of_crashing(self):
         data = self.task()
         data["dependencies"] = [{"from": ["C1"], "to": "C2"}]
@@ -198,6 +272,34 @@ class ValidateTests(Fixture):
 
 
 class CostTests(Fixture):
+    def test_decimal_budget_boundary_and_actual_excess(self):
+        budget = self.subscription_budget()
+        budget.update(attachment_count=0, model_runs=0, subscription_allocated_cost=0.2,
+                      fixed_cost=0.1, budget_cap=0.3)
+        report = taskkit.estimate_cost(self.json_file("budget.json", budget))
+        self.assertEqual(report["status"], "WITHIN_ESTIMATE")
+        self.assertEqual(report["total_cost"], 0.3)
+        self.assertEqual(report["remaining_budget"], 0)
+        budget["fixed_cost"] = 0.1001
+        self.assertEqual(taskkit.estimate_cost(self.json_file("budget.json", budget))["status"], "OVER_BUDGET")
+
+    def test_decimal_labor_and_api_boundaries(self):
+        budget = self.budget()
+        budget.update(attachment_count=1, author_minutes_per_attachment=1,
+                      review_minutes_per_attachment=0, rework_rate=0, hourly_rate=180,
+                      fixed_cost=0, model_runs=0, budget_cap=3)
+        self.assertEqual(taskkit.estimate_cost(self.json_file("budget.json", budget))["status"], "WITHIN_ESTIMATE")
+        budget.update(attachment_count=0, model_runs=1, input_tokens_per_run=100000,
+                      input_price_per_million=1, output_tokens_per_run=100000,
+                      output_price_per_million=2, tool_cost_per_run=0, budget_cap=0.3)
+        self.assertEqual(taskkit.estimate_cost(self.json_file("budget.json", budget))["status"], "WITHIN_ESTIMATE")
+
+    def test_decimal_results_outside_finite_json_range_are_rejected(self):
+        budget = self.budget()
+        budget.update(hourly_rate=1e308, author_minutes_per_attachment=1e308)
+        with self.assertRaises(taskkit.InputError):
+            taskkit.estimate_cost(self.json_file("budget.json", budget))
+
     def test_api_and_subscription_modes_compute_equivalent_budgets(self):
         api = taskkit.estimate_cost(self.json_file("api.json", self.budget()))
         subscription = taskkit.estimate_cost(self.json_file("subscription.json", self.subscription_budget()))
@@ -338,6 +440,15 @@ class RunTests(Fixture):
             item[name] = "0" * 64
             with self.assertRaises(taskkit.InputError):
                 self.check([item])
+
+    def test_empty_trace_or_score_evidence_rejected(self):
+        for field in ("trace", "score_evidence"):
+            with self.subTest(field=field):
+                item = self.make_run()
+                self.write(item[field + "_path"], "")
+                item[field + "_sha256"] = self.sha(item[field + "_path"])
+                with self.assertRaisesRegex(taskkit.InputError, "empty file"):
+                    self.check([item])
 
     def test_reused_trace_and_duplicate_run_id_rejected(self):
         a, b = self.make_run("a"), self.make_run("b")

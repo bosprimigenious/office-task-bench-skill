@@ -11,5 +11,17 @@
     "remaining": 0
   },
   "remaining_total": 800,
-  "reason": "I002未验收；I001扣除已付款，不能再付1000"
+  "reason": "I002未验收；I001扣除已付款，不能再付1000",
+  "evidence": {
+    "I001": [
+      "inputs/rules.txt:3-4",
+      "inputs/invoices.csv:2 (invoice_id=I001)",
+      "inputs/payments.csv:2 (payment_id=P001, invoice_id=I001)"
+    ],
+    "I002": [
+      "inputs/rules.txt:3",
+      "inputs/invoices.csv:3 (invoice_id=I002)"
+    ],
+    "remaining_total": "I001.remaining + I002.remaining = 800.00 + 0.00 = 800.00"
+  }
 }

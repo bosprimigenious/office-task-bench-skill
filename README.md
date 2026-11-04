@@ -33,8 +33,25 @@ python3 -m unittest discover -s tests -v
 将本仓库克隆到自己的技能中枢，再在工具的skills目录建立符号链接；不要覆盖已有同名技能。以下为已有中枢和Codex目录的示例：
 
 ```bash
-git clone https://github.com/bosprimigenious/office-task-bench-skill.git ~/shared-ai-skills/office-task-bench-skill
-ln -s ~/shared-ai-skills/office-task-bench-skill ~/.codex/skills/office-task-bench-skill
+(
+  set -eu
+  skill_source="${HOME}/shared-ai-skills/office-task-bench-skill"
+  skill_target="${HOME}/.codex/skills/office-task-bench-skill"
+  if [ -L "$skill_target" ] &&
+     [ "$(readlink "$skill_target")" = "$skill_source" ] &&
+     [ -f "$skill_source/SKILL.md" ]; then
+    printf '%s\n' '已安装，未作修改。'
+    exit 0
+  fi
+  if [ -e "$skill_source" ] || [ -L "$skill_source" ] ||
+     [ -e "$skill_target" ] || [ -L "$skill_target" ]; then
+    printf '%s\n' '源目录或入口已存在，请按你的技能中枢流程同步；未覆盖。' >&2
+    exit 1
+  fi
+  git clone https://github.com/bosprimigenious/office-task-bench-skill.git "$skill_source"
+  mkdir -p "${skill_target%/*}"
+  ln -s "$skill_source" "$skill_target"
+)
 ```
 
 如果中枢本身是Git仓库，建议按其中枢管理方式导入/同步，避免嵌套Git仓库；本机使用中枢派生和构建脚本即可。新安装后重新启动会话，或显式读取 `SKILL.md`。

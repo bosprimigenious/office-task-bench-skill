@@ -1,11 +1,11 @@
 {
   "schema_version": 1,
-  "id": "synthetic-payables-demo-v1",
+  "id": "synthetic-payables-demo-v2",
   "title": "两笔采购付款审核合成演示",
   "purpose": "验证题包结构与工具，不能提交为真实高经济价值任务",
   "mode": "synthetic_demo",
   "prompt_path": "prompt.md",
-  "prompt_sha256": "3b32113cb86db839b92280d1a0bc0e8383f1704d8ad1b9a0aa45f9fc829f2c03",
+  "prompt_sha256": "9bda71ea74ea9ffb72ca8f744d7b9c86e5f97fe55ec9019dc39903b5ebc3026e",
   "inputs": [
     {
       "id": "A01",
@@ -71,7 +71,7 @@
       ],
       "deliverable_id": "D01",
       "oracle_path": "private/oracle.json",
-      "oracle_sha256": "bb4a7d99f2a16e93a912fd80dbd4b87d22c97e29e197ccdb6f9d34ba0bd37207",
+      "oracle_sha256": "0a28d0728b6c8bedcf9694d655e9464e7c0a2ba81c572f4f24002adb27c80966",
       "tolerance": "金额允许误差0.01元；状态与原因必须正确"
     },
     {
@@ -84,7 +84,7 @@
       ],
       "deliverable_id": "D01",
       "oracle_path": "private/oracle.json",
-      "oracle_sha256": "bb4a7d99f2a16e93a912fd80dbd4b87d22c97e29e197ccdb6f9d34ba0bd37207",
+      "oracle_sha256": "0a28d0728b6c8bedcf9694d655e9464e7c0a2ba81c572f4f24002adb27c80966",
       "tolerance": "金额允许误差0.01元；状态与原因必须正确"
     },
     {
@@ -98,7 +98,7 @@
       ],
       "deliverable_id": "D01",
       "oracle_path": "private/oracle.json",
-      "oracle_sha256": "bb4a7d99f2a16e93a912fd80dbd4b87d22c97e29e197ccdb6f9d34ba0bd37207",
+      "oracle_sha256": "0a28d0728b6c8bedcf9694d655e9464e7c0a2ba81c572f4f24002adb27c80966",
       "tolerance": "金额允许误差0.01元；状态与原因必须正确"
     },
     {
@@ -112,7 +112,7 @@
       ],
       "deliverable_id": "D01",
       "oracle_path": "private/oracle.json",
-      "oracle_sha256": "bb4a7d99f2a16e93a912fd80dbd4b87d22c97e29e197ccdb6f9d34ba0bd37207",
+      "oracle_sha256": "0a28d0728b6c8bedcf9694d655e9464e7c0a2ba81c572f4f24002adb27c80966",
       "tolerance": "金额允许误差0.01元；状态与原因必须正确"
     },
     {
@@ -126,7 +126,7 @@
       ],
       "deliverable_id": "D02",
       "oracle_path": "private/oracle.json",
-      "oracle_sha256": "bb4a7d99f2a16e93a912fd80dbd4b87d22c97e29e197ccdb6f9d34ba0bd37207",
+      "oracle_sha256": "0a28d0728b6c8bedcf9694d655e9464e7c0a2ba81c572f4f24002adb27c80966",
       "tolerance": "金额允许误差0.01元；状态与原因必须正确"
     }
   ],
