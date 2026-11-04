@@ -1,0 +1,19 @@
+{
+  "currency": "CNY",
+  "attachment_count": 24,
+  "author_minutes_per_attachment": 6,
+  "review_minutes_per_attachment": 4,
+  "rework_rate": 0.2,
+  "rework_minutes_per_attachment": 5,
+  "hourly_rate": 200,
+  "fixed_cost": 0,
+  "model_runs": 3,
+  "input_tokens_per_run": 100000,
+  "output_tokens_per_run": 20000,
+  "input_price_per_million": 2,
+  "output_price_per_million": 8,
+  "tool_cost_per_run": 0,
+  "budget_cap": 1200,
+  "assumption_note": "全部单价与工作量均为演示假设，不是供应商报价。请填写真实预算，固定成本包括订阅分摊与标准答案制作等共享工作。",
+  "billing_mode": "api"
+}

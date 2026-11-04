@@ -1,0 +1,3 @@
+invoice_id,supplier,amount,accepted
+I001,Demo-A,1000.00,true
+I002,Demo-B,500.00,false

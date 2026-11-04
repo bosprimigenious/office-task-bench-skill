@@ -1,0 +1,15 @@
+{
+  "synthetic_demo": true,
+  "I001": {
+    "eligible": 1000,
+    "paid": 200,
+    "remaining": 800
+  },
+  "I002": {
+    "eligible": 0,
+    "paid": 0,
+    "remaining": 0
+  },
+  "remaining_total": 800,
+  "reason": "I002未验收；I001扣除已付款，不能再付1000"
+}

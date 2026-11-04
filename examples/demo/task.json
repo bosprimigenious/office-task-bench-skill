@@ -1,0 +1,151 @@
+{
+  "schema_version": 1,
+  "id": "synthetic-payables-demo-v1",
+  "title": "两笔采购付款审核合成演示",
+  "purpose": "验证题包结构与工具，不能提交为真实高经济价值任务",
+  "mode": "synthetic_demo",
+  "prompt_path": "prompt.md",
+  "prompt_sha256": "3b32113cb86db839b92280d1a0bc0e8383f1704d8ad1b9a0aa45f9fc829f2c03",
+  "inputs": [
+    {
+      "id": "A01",
+      "path": "inputs/rules.txt",
+      "sha256": "6b3ce6fcaf85607e76cb7e0a6ce1a5997f071e15fc9b6d10f6d5bdd42e3cac3e",
+      "role": "rule",
+      "source_ref": "原创合成演示，非真实业务",
+      "used_by": [
+        "C01",
+        "C02",
+        "C03",
+        "C04",
+        "C05"
+      ]
+    },
+    {
+      "id": "A02",
+      "path": "inputs/invoices.csv",
+      "sha256": "6ad8ab49a9b745432c06a7749b3ea88cbf2fc7baa338addf1b8ec5c4380044cc",
+      "role": "evidence",
+      "source_ref": "原创合成演示，非真实业务",
+      "used_by": [
+        "C01",
+        "C02",
+        "C03",
+        "C04",
+        "C05"
+      ]
+    },
+    {
+      "id": "A03",
+      "path": "inputs/payments.csv",
+      "sha256": "375c85746f13482a546d2e6843af7f6fcc6d3540851d54c44bdb8edd41773175",
+      "role": "evidence",
+      "source_ref": "原创合成演示，非真实业务",
+      "used_by": [
+        "C03",
+        "C04",
+        "C05"
+      ]
+    }
+  ],
+  "deliverables": [
+    {
+      "id": "D01",
+      "path": "output/review.csv",
+      "description": "逐笔金额和合计"
+    },
+    {
+      "id": "D02",
+      "path": "output/memo.md",
+      "description": "依据与原因"
+    }
+  ],
+  "criteria": [
+    {
+      "id": "C01",
+      "weight": 20,
+      "description": "I001可付金额1000元",
+      "input_ids": [
+        "A01",
+        "A02"
+      ],
+      "deliverable_id": "D01",
+      "oracle_path": "private/oracle.json",
+      "oracle_sha256": "bb4a7d99f2a16e93a912fd80dbd4b87d22c97e29e197ccdb6f9d34ba0bd37207",
+      "tolerance": "金额允许误差0.01元；状态与原因必须正确"
+    },
+    {
+      "id": "C02",
+      "weight": 20,
+      "description": "I002未验收，可付及剩余均为0",
+      "input_ids": [
+        "A01",
+        "A02"
+      ],
+      "deliverable_id": "D01",
+      "oracle_path": "private/oracle.json",
+      "oracle_sha256": "bb4a7d99f2a16e93a912fd80dbd4b87d22c97e29e197ccdb6f9d34ba0bd37207",
+      "tolerance": "金额允许误差0.01元；状态与原因必须正确"
+    },
+    {
+      "id": "C03",
+      "weight": 20,
+      "description": "I001已付200元，剩余800元",
+      "input_ids": [
+        "A01",
+        "A02",
+        "A03"
+      ],
+      "deliverable_id": "D01",
+      "oracle_path": "private/oracle.json",
+      "oracle_sha256": "bb4a7d99f2a16e93a912fd80dbd4b87d22c97e29e197ccdb6f9d34ba0bd37207",
+      "tolerance": "金额允许误差0.01元；状态与原因必须正确"
+    },
+    {
+      "id": "C04",
+      "weight": 20,
+      "description": "剩余应付总额800元",
+      "input_ids": [
+        "A01",
+        "A02",
+        "A03"
+      ],
+      "deliverable_id": "D01",
+      "oracle_path": "private/oracle.json",
+      "oracle_sha256": "bb4a7d99f2a16e93a912fd80dbd4b87d22c97e29e197ccdb6f9d34ba0bd37207",
+      "tolerance": "金额允许误差0.01元；状态与原因必须正确"
+    },
+    {
+      "id": "C05",
+      "weight": 20,
+      "description": "说明未验收及扣除已付的理由并引用原始记录",
+      "input_ids": [
+        "A01",
+        "A02",
+        "A03"
+      ],
+      "deliverable_id": "D02",
+      "oracle_path": "private/oracle.json",
+      "oracle_sha256": "bb4a7d99f2a16e93a912fd80dbd4b87d22c97e29e197ccdb6f9d34ba0bd37207",
+      "tolerance": "金额允许误差0.01元；状态与原因必须正确"
+    }
+  ],
+  "dependencies": [
+    {
+      "from": "C01",
+      "to": "C03"
+    },
+    {
+      "from": "C02",
+      "to": "C04"
+    },
+    {
+      "from": "C03",
+      "to": "C04"
+    },
+    {
+      "from": "C04",
+      "to": "C05"
+    }
+  ]
+}

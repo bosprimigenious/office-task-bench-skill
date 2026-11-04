@@ -1,0 +1,4 @@
+interface:
+  display_name: "办公长任务质量与成本"
+  short_description: "设计可核验的办公任务，控制附件制作成本，并记录模型实际耗时与得分"
+  default_prompt: "使用 $office-task-bench-skill 审计我的材料、估算成本，并从最小完整任务开始设计和实测。"

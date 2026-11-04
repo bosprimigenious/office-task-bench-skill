@@ -1,0 +1,14 @@
+__pycache__/
+*.py[cod]
+.DS_Store
+.env
+.env.*
+*.pem
+*.key
+private/
+!examples/demo/private/
+!examples/demo/private/**
+task-packs/
+runs/
+work/
+outputs/

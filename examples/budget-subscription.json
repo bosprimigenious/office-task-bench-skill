@@ -1,0 +1,17 @@
+{
+  "currency": "CNY",
+  "attachment_count": 24,
+  "author_minutes_per_attachment": 6,
+  "review_minutes_per_attachment": 4,
+  "rework_rate": 0.2,
+  "rework_minutes_per_attachment": 5,
+  "hourly_rate": 200,
+  "fixed_cost": 0,
+  "model_runs": 3,
+  "tool_cost_per_run": 0,
+  "budget_cap": 1200,
+  "assumption_note": "演示假设：本任务分摊订阅费100元，每次已知额外费0；不是豆包当前报价。实际未知费用不得填0。",
+  "billing_mode": "subscription",
+  "subscription_allocated_cost": 100,
+  "overage_cost_per_run": 0
+}
